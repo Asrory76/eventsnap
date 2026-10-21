@@ -1,0 +1,16 @@
+rules_version = '2';
+
+// EventSnap — Storage rules.
+// Foto di-upload ke events/{eventId}/{uid}/{file}.jpg.
+// Baca publik (untuk gallery), tulis hanya signed-in dan harus di folder uid-nya sendiri.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /events/{eventId}/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 15 * 1024 * 1024 // max 15 MB
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

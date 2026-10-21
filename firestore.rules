@@ -1,0 +1,57 @@
+rules_version = '2';
+
+// EventSnap — Firestore security rules.
+// Model:
+//   events/{eventId}                -> dibuat oleh signed-in user (ownerUid)
+//   events/{eventId}/photos/{id}    -> bisa dibaca publik (gallery share),
+//                                      bisa dibuat oleh siapa saja yang SIGNED-IN
+//                                      (termasuk anon), hanya owner/pemilik foto
+//                                      yang boleh ubah/hapus.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isEventOwner(eventId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/events/$(eventId)).data.ownerUid
+             == request.auth.uid;
+    }
+
+    match /events/{eventId} {
+      // Album boleh dibaca siapa saja yang signed-in (guest perlu lihat event info)
+      allow read: if signedIn();
+      // Hanya boleh create event yang ownerUid-nya = diri sendiri
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120;
+      // Edit/hapus hanya owner
+      allow update, delete: if isEventOwner(eventId);
+
+      match /photos/{photoId} {
+        // Gallery tampil publik: baca bebas
+        allow read: if true;
+        // Upload foto: harus signed-in (anon juga oke), uploadedBy = diri sendiri
+        allow create: if signedIn()
+          && request.resource.data.uploadedBy == request.auth.uid
+          && request.resource.data.eventId == eventId
+          && request.resource.data.storagePath is string
+          && request.resource.data.url is string;
+        // Hapus foto: owner event ATAU pemilik foto (supaya guest bisa tarik sendiri)
+        allow delete: if isEventOwner(eventId)
+          || (signedIn() && resource.data.uploadedBy == request.auth.uid);
+        // Update: hanya owner event (mis. moderasi/flag)
+        allow update: if isEventOwner(eventId);
+      }
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create, update: if signedIn() && request.auth.uid == userId;
+    }
+  }
+}
