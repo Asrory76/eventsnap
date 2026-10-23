@@ -1,17 +1,10 @@
 "use client";
 
-// Daftar event milik user (pemilik = ownerUid == uid sesi anon).
-// Produksi: ganti anon -> Google login supaya daftar persisten lintas device.
+// Daftar event milik user (pemilik = hostId / ownerUid).
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  collection,
-  onSnapshot,
-  query,
-  orderBy,
-} from "firebase/firestore";
-import { fb, type EventDoc } from "@/lib/events";
-import { signIn } from "@/lib/auth";
+import { signIn, subscribeEventsByHost } from "@/lib/services";
+import { type EventDoc } from "@/types";
 
 export default function DashboardPage() {
   const [events, setEvents] = useState<EventDoc[] | null>(null);
@@ -25,45 +18,46 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!uid) return;
-    const q = query(collection(fb().db, "events"), orderBy("createdAt", "desc"));
-    // MVP filter klien-sisi; rules tetap jadi pengaman sesungguhnya.
-    const unsub = onSnapshot(q, (snap) => {
-      setEvents(
-        snap.docs
-          .map((d) => ({ id: d.id, ...(d.data() as Omit<EventDoc, "id">) }))
-          .filter((e) => e.ownerUid === uid)
-      );
-    });
+    const unsub = subscribeEventsByHost(
+      uid,
+      (fetchedEvents) => setEvents(fetchedEvents),
+      (err) => console.error("Gagal memuat event:", err)
+    );
     return () => unsub();
   }, [uid]);
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-2xl flex-col gap-6 p-6 sm:p-8">
+    <main className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-4xl flex-col gap-8 p-6 sm:p-12 text-[#ffffff]">
       {/* Page header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-white/10 pb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold sm:text-3xl">Album Saya</h1>
-          <p className="mt-1 text-sm text-zinc-500">
+          <span className="text-[11px] uppercase tracking-[0.25em] text-[#cfcfcf]">
+            USER ARCHIVES // REPOSITORY
+          </span>
+          <h1 className="mt-2 font-['Unbounded'] text-2xl sm:text-4xl font-bold uppercase tracking-[0.067em] text-[#ffffff]">
+            ALBUM SAYA
+          </h1>
+          <p className="mt-2 text-xs sm:text-sm uppercase tracking-[0.132em] text-[#cfcfcf]">
             {events === null
-              ? "Memuat acara…"
-              : `${events.length} acara`}
+              ? "MEMUAT REPOSITORI ACARA…"
+              : `${events.length} ACARA TERCATAT DALAM SISTEM`}
           </p>
         </div>
         <Link
           href="/create"
-          className="rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md hover:shadow-purple-500/20 active:scale-[0.97]"
+          className="btn-ghost-sm whitespace-nowrap self-start sm:self-auto"
         >
-          + Acara Baru
+          + ACARA BARU
         </Link>
       </div>
 
-      {/* Loading skeleton */}
+      {/* Loading skeleton with sharp geometric blocks */}
       {events === null && (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="h-20 animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800"
+              className="h-24 animate-pulse surface-carbon border border-white/10"
             />
           ))}
         </div>
@@ -71,72 +65,93 @@ export default function DashboardPage() {
 
       {/* Empty state */}
       {events?.length === 0 && (
-        <div className="flex flex-1 flex-col items-center justify-center gap-5 py-16 text-center">
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-zinc-100 text-5xl dark:bg-zinc-800">
-            📸
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 py-20 text-center border border-dashed border-white/20 surface-carbon p-8">
+          <div className="flex h-16 w-16 items-center justify-center border border-white/40 bg-black">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#ffffff"
+              strokeWidth="1.2"
+            >
+              <rect x="3" y="3" width="18" height="18" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
           </div>
           <div>
-            <p className="font-semibold">Belum ada acara</p>
-            <p className="mt-1 text-sm text-zinc-500">
-              Buat acara pertama Anda dan mulai kumpulkan foto!
+            <p className="font-['Unbounded'] text-lg font-semibold uppercase tracking-[0.1em] text-[#ffffff]">
+              BELUM ADA ACARA
+            </p>
+            <p className="mt-2 text-xs uppercase tracking-[0.15em] text-[#cfcfcf] max-w-sm">
+              Inisialisasi acara pertama Anda dan mulai kumpulkan foto bersama seluruh tamu secara live.
             </p>
           </div>
           <Link
             href="/create"
-            className="rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-8 py-3 font-semibold text-white shadow-lg shadow-purple-500/25 transition hover:shadow-xl active:scale-[0.97]"
+            className="btn-ghost"
           >
-            Buat Acara Pertama →
+            BUAT ACARA PERTAMA →
           </Link>
         </div>
       )}
 
       {/* Event list */}
       {events && events.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {events.map((e, i) => (
+        <div className="flex flex-col gap-4">
+          {events.map((e) => (
             <Link
               key={e.id}
               href={`/events/${e.id}`}
-              className="group flex items-center justify-between rounded-2xl border border-zinc-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
-              style={{
-                animation: `fadeIn 0.4s ease-out ${i * 60}ms both`,
-              }}
+              className="group flex items-center justify-between surface-carbon p-6 border border-white/15 transition-all hover:border-white hover:bg-[#181818]"
             >
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 text-xl">
-                  📷
+              <div className="flex items-center gap-5">
+                <div className="flex h-12 w-12 items-center justify-center border border-white/30 bg-black group-hover:border-white transition-colors">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth="1.2"
+                  >
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
                 </div>
                 <div>
-                  <span className="font-semibold group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                  <h3 className="font-['Unbounded'] text-base sm:text-lg font-medium uppercase tracking-[0.08em] text-[#ffffff] group-hover:underline underline-offset-4">
                     {e.title}
-                  </span>
-                  <p className="mt-0.5 text-xs text-zinc-400">
-                    {e.createdAt
-                      ? new Date(e.createdAt.seconds * 1000).toLocaleDateString(
-                          "id-ID",
-                          {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          }
-                        )
-                      : "Baru dibuat"}
-                  </p>
+                  </h3>
+                  <div className="mt-1 flex items-center gap-3 text-[11px] uppercase tracking-[0.188em] text-[#cfcfcf]">
+                    <span>
+                      {e.createdAt
+                        ? new Date(e.createdAt.seconds * 1000).toLocaleDateString(
+                            "id-ID",
+                            {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            }
+                          )
+                        : "BARU"}
+                    </span>
+                    <span className="h-1 w-1 bg-white/40" />
+                    <span className="font-mono text-[10px] text-[#888888]">
+                      ID // {e.id.substring(0, 8)}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <svg
-                className="h-5 w-5 text-zinc-300 transition group-hover:translate-x-1 group-hover:text-purple-500 dark:text-zinc-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
+
+              <div className="flex items-center gap-3">
+                <span className="hidden sm:inline-block text-[11px] uppercase tracking-[0.188em] text-[#cfcfcf] opacity-0 group-hover:opacity-100 transition-opacity">
+                  MASUK ALBUM
+                </span>
+                <div className="flex h-8 w-8 items-center justify-center border border-white/20 group-hover:border-white transition-colors">
+                  <span className="text-white text-xs">→</span>
+                </div>
+              </div>
             </Link>
           ))}
         </div>

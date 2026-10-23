@@ -1,57 +1,145 @@
 rules_version = '2';
 
-// EventSnap — Firestore security rules.
-// Model:
-//   events/{eventId}                -> dibuat oleh signed-in user (ownerUid)
-//   events/{eventId}/photos/{id}    -> bisa dibaca publik (gallery share),
-//                                      bisa dibuat oleh siapa saja yang SIGNED-IN
-//                                      (termasuk anon), hanya owner/pemilik foto
-//                                      yang boleh ubah/hapus.
+// PicMe (EventSnap) — Production-Grade Firestore Security Rules
+// Menjaga integritas data multi-tenant, kuota foto atomik, dan otorisasi Host vs Tamu (Guest/Anonymous)
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() {
+    // --- Helper Functions Standar ---
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isEventOwner(eventId) {
-      return signedIn()
-        && get(/databases/$(database)/documents/events/$(eventId)).data.ownerUid
-             == request.auth.uid;
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    match /events/{eventId} {
-      // Album boleh dibaca siapa saja yang signed-in (guest perlu lihat event info)
-      allow read: if signedIn();
-      // Hanya boleh create event yang ownerUid-nya = diri sendiri
-      allow create: if signedIn()
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.title is string
-        && request.resource.data.title.size() > 0
-        && request.resource.data.title.size() <= 120;
-      // Edit/hapus hanya owner
-      allow update, delete: if isEventOwner(eventId);
+    function incomingData() {
+      return request.resource.data;
+    }
 
+    function existingData() {
+      return resource.data;
+    }
+
+    function isEventHost(eventData) {
+      return isAuthenticated() && (
+        request.auth.uid == eventData.hostId ||
+        request.auth.uid == eventData.ownerUid
+      );
+    }
+
+    function getEvent(eventId) {
+      return get(/databases/$(database)/documents/events/$(eventId)).data;
+    }
+
+    // --- Events Collection ---
+    match /events/{eventId} {
+      // Siapa saja (termasuk tamu yang scan QR) dapat membaca informasi event
+      allow read: if true;
+
+      // Hanya Host terautentikasi yang boleh membuat event baru dengan skema awal valid
+      allow create: if isAuthenticated()
+        && (incomingData().hostId == request.auth.uid || incomingData().ownerUid == request.auth.uid)
+        && incomingData().title is string
+        && incomingData().title.size() > 0
+        && incomingData().title.size() <= 120
+        && incomingData().maxPhotoQuota is int
+        && incomingData().maxPhotoQuota > 0
+        && incomingData().usedPhotoQuota is int
+        && incomingData().usedPhotoQuota == 0;
+
+      // Update event:
+      // 1. Host dapat mengubah konfigurasi event apa pun
+      // 2. Transaksi upload foto oleh tamu: hanya boleh menambah usedPhotoQuota jika event aktif & belum penuh
+      // 3. Transaksi hapus foto oleh tamu/host: hanya boleh mengurangi usedPhotoQuota
+      allow update: if isEventHost(existingData())
+        || (
+          isAuthenticated()
+          && existingData().status == 'active'
+          && incomingData().diff(existingData()).affectedKeys().hasOnly(['usedPhotoQuota', 'updatedAt'])
+          && incomingData().usedPhotoQuota == existingData().usedPhotoQuota + 1
+          && incomingData().usedPhotoQuota <= existingData().maxPhotoQuota
+        )
+        || (
+          isAuthenticated()
+          && incomingData().diff(existingData()).affectedKeys().hasOnly(['usedPhotoQuota', 'updatedAt'])
+          && incomingData().usedPhotoQuota == existingData().usedPhotoQuota - 1
+          && incomingData().usedPhotoQuota >= 0
+        );
+
+      // Hanya Host yang boleh menghapus dokumen event
+      allow delete: if isEventHost(existingData());
+
+      // --- Photos Subcollection ---
       match /photos/{photoId} {
-        // Gallery tampil publik: baca bebas
+        // Galeri & Live Stream Wall dapat dibaca secara publik
         allow read: if true;
-        // Upload foto: harus signed-in (anon juga oke), uploadedBy = diri sendiri
-        allow create: if signedIn()
-          && request.resource.data.uploadedBy == request.auth.uid
-          && request.resource.data.eventId == eventId
-          && request.resource.data.storagePath is string
-          && request.resource.data.url is string;
-        // Hapus foto: owner event ATAU pemilik foto (supaya guest bisa tarik sendiri)
-        allow delete: if isEventOwner(eventId)
-          || (signedIn() && resource.data.uploadedBy == request.auth.uid);
-        // Update: hanya owner event (mis. moderasi/flag)
-        allow update: if isEventOwner(eventId);
+
+        // Unggah foto oleh Tamu atau Host:
+        // - Harus terautentikasi (bisa Anonymous Auth atau Google Auth)
+        // - ID pengunggah sesuai dengan token sesi aktif
+        // - Event harus berstatus 'active'
+        // - Kuota event belum penuh
+        allow create: if isAuthenticated()
+          && incomingData().uploadedBy == request.auth.uid
+          && incomingData().eventId == eventId
+          && incomingData().storagePath is string
+          && incomingData().url is string
+          && getEvent(eventId).status == 'active'
+          && getEvent(eventId).usedPhotoQuota < getEvent(eventId).maxPhotoQuota;
+
+        // Update foto:
+        // 1. Host dapat memperbarui status foto (moderasi: approved/rejected)
+        // 2. Tamu/Pengguna dapat memperbarui counter komentar secara atomik saat menambah/menghapus ucapan
+        // 3. Tamu/Pengguna dapat memperbarui likesCount (+1 / -1)
+        allow update: if isEventHost(getEvent(eventId))
+          || (
+            isAuthenticated()
+            && getEvent(eventId).status == 'active'
+            && incomingData().diff(existingData()).affectedKeys().hasOnly(['commentsCount'])
+            && (incomingData().commentsCount == existingData().commentsCount + 1 || incomingData().commentsCount == existingData().commentsCount - 1)
+          )
+          || (
+            isAuthenticated()
+            && incomingData().diff(existingData()).affectedKeys().hasOnly(['likesCount'])
+            && (incomingData().likesCount == existingData().likesCount + 1 || incomingData().likesCount == existingData().likesCount - 1)
+          );
+
+        // Hapus foto: Hanya Host event ATAU tamu pemilik foto yang bersangkutan
+        allow delete: if isEventHost(getEvent(eventId))
+          || (isAuthenticated() && existingData().uploadedBy == request.auth.uid);
+      }
+
+      // --- Comments Subcollection ---
+      match /comments/{commentId} {
+        // Komentar dan ucapan selamat dapat dibaca publik di Live Stream Wall
+        allow read: if true;
+
+        // Tambah ucapan/komentar: tamu terautentikasi, event harus aktif, teks 1-500 karakter
+        allow create: if isAuthenticated()
+          && incomingData().authorUid == request.auth.uid
+          && incomingData().eventId == eventId
+          && incomingData().message is string
+          && incomingData().message.size() > 0
+          && incomingData().message.size() <= 500
+          && getEvent(eventId).status == 'active';
+
+        // Update komentar: tidak diizinkan untuk menjaga keaslian live feed
+        allow update: if false;
+
+        // Hapus komentar: Host event atau pembuat komentar
+        allow delete: if isEventHost(getEvent(eventId))
+          || (isAuthenticated() && existingData().authorUid == request.auth.uid);
       }
     }
 
+    // --- Users Collection ---
     match /users/{userId} {
-      allow read: if signedIn() && request.auth.uid == userId;
-      allow create, update: if signedIn() && request.auth.uid == userId;
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId);
+      allow delete: if false;
     }
   }
 }

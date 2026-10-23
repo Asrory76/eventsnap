@@ -1,43 +1,51 @@
 import { Suspense } from "react";
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
 import Header from "@/components/Header";
+import CookieConsent from "@/components/CookieConsent";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export const metadata: Metadata = {
-  title: "EventSnap — Album Foto Acara Kolaboratif",
+  title: "PicMe — Abadikan Setiap Cerita Bersama Kami",
   description:
-    "Buat acara, bagikan QR code ke tamu, dan kumpulkan semua foto dalam satu album bersama secara realtime. Gratis, tanpa install aplikasi.",
-  keywords: ["event", "foto", "album", "QR code", "kolaboratif", "acara"],
+    "Platform dokumentasi acara yang memudahkan tamu berbagi foto dan video dalam satu galeri langsung dari smartphone. Elegan, aman, dan dirancang untuk Wedding Organizer.",
+  keywords: [
+    "wedding",
+    "PicMe",
+    "foto pernikahan",
+    "galeri tamu",
+    "wedding organizer",
+    "live moment wall",
+    "kamera hp pernikahan",
+    "QR code pernikahan",
+  ],
   openGraph: {
-    title: "EventSnap — Album Foto Acara Kolaboratif",
+    title: "PicMe — Abadikan Setiap Cerita Bersama Kami",
     description:
-      "Satu QR code. Semua tamu jadi fotografer. Kumpulkan momen indah acara Anda.",
+      "Platform dokumentasi acara yang memudahkan tamu berbagi foto dan video dalam satu galeri langsung dari smartphone.",
     type: "website",
   },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html
-      lang="id"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
-        <Suspense fallback={<header className="h-16 border-b border-zinc-200/60 bg-white/80 dark:border-zinc-800/60 dark:bg-zinc-950/80" />}>
+    <html lang="id" className="h-full bg-[#141210] antialiased">
+      <body className="min-h-full flex flex-col bg-[#141210] text-[#FFFFFF] selection:bg-[#B88E4F] selection:text-white overflow-x-hidden">
+        <Suspense fallback={<header className="h-20 border-b border-white/10 bg-[#141210]" />}>
           <Header />
         </Suspense>
-        <div className="flex-1">{children}</div>
+        <div className="flex-1 flex flex-col w-full overflow-x-hidden">{children}</div>
+        <CookieConsent />
       </body>
     </html>
   );

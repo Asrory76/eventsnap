@@ -37,6 +37,11 @@ yarn-error.log*
 # vercel
 .vercel
 
-# typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# archive & dumps
+*.zip
+*.tar.gz
+picme-code.txt
+

@@ -1,8 +1,8 @@
 "use client";
 
 // Halaman: buat event baru -> dapat eventId -> tampil tombol camera & QR.
-import { signIn } from "@/lib/auth";
-import { createEvent } from "@/lib/events";
+import { signIn, createEvent, getEventCameraUrl } from "@/lib/services";
+import { PicMeError } from "@/lib/errors";
 import { useState } from "react";
 import Link from "next/link";
 import QrBadge from "@/components/QrBadge";
@@ -12,18 +12,21 @@ export default function CreateEventPage() {
   const [eventId, setEventId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   async function submit() {
     setBusy(true);
     setError(null);
     try {
-      // MVP: guest session anon dibuat otomatis kalau belum ada.
-      // (Produksi: ganti signInAnon -> signInWithPopup(Google) untuk creator.)
       await signIn();
-      const id = await createEvent(title);
-      setEventId(id);
+      const newEvent = await createEvent(title);
+      setEventId(newEvent.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (e instanceof PicMeError) {
+        setError(e.message);
+      } else {
+        setError(e instanceof Error ? e.message : String(e));
+      }
     } finally {
       setBusy(false);
     }
@@ -31,58 +34,96 @@ export default function CreateEventPage() {
 
   /* ---- Success state ---- */
   if (eventId) {
-    const albumUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/events/${eventId}`;
-    const cameraUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/events/${eventId}/camera`;
+    const cameraUrl = getEventCameraUrl(eventId);
+
+    const copyToClipboard = async () => {
+      try {
+        await navigator.clipboard.writeText(cameraUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
     return (
-      <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col items-center justify-center gap-8 p-6 sm:p-8">
-        {/* Success badge */}
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-100 text-4xl dark:bg-green-900/30">
-          ✅
+      <main className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-xl flex-col items-center justify-center p-6 sm:p-12 text-[#ffffff]">
+        {/* Geometric indicator mark */}
+        <div className="mb-6 flex h-14 w-14 items-center justify-center border border-white/40 bg-[#111111]">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="1.5"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
         </div>
 
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">Acara Berhasil Dibuat!</h1>
-          <p className="mt-2 text-sm text-zinc-500">
-            Bagikan QR code di bawah ke para tamu.
+        {/* Title */}
+        <div className="text-center mb-8">
+          <span className="text-[11px] uppercase tracking-[0.25em] text-[#cfcfcf]">
+            INITIALIZATION COMPLETE
+          </span>
+          <h1 className="mt-2 font-['Unbounded'] text-2xl sm:text-3xl font-bold uppercase tracking-[0.067em] text-[#ffffff]">
+            ACARA BERHASIL DIBUAT
+          </h1>
+          <p className="mt-3 text-xs sm:text-sm uppercase tracking-[0.132em] text-[#cfcfcf]">
+            Bagikan QR code akses di bawah ke seluruh tamu yang hadir.
           </p>
         </div>
 
-        {/* QR Code card */}
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <QrBadge value={cameraUrl} size={200} />
-          <p className="max-w-xs text-center text-xs text-zinc-500">
-            Cetak atau share QR di atas ke tamu → langsung buka kamera untuk
-            ambil foto.
+        {/* QR Code Frame per DESIGN.md (0px radius, 1px border) */}
+        <div className="w-full surface-carbon p-8 flex flex-col items-center border border-white/20 mb-6">
+          <div className="border border-white/30 p-4 bg-white">
+            <QrBadge value={cameraUrl} size={220} />
+          </div>
+          <p className="mt-5 text-center text-[11px] uppercase tracking-[0.188em] text-[#cfcfcf] max-w-sm">
+            Scan QR via smartphone untuk membuka akses langsung ke viewfinder kamera tanpa instalasi.
           </p>
         </div>
 
-        {/* Album link */}
-        <div className="w-full rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="mb-1 text-xs font-medium text-zinc-400">Link Album</p>
-          <code className="block overflow-x-auto text-xs text-zinc-600 dark:text-zinc-400">
-            {albumUrl}
+        {/* Shareable Link Box */}
+        <div className="w-full border border-white/20 bg-[#111111] p-5 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] uppercase tracking-[0.188em] text-[#cfcfcf]">
+              DIRECT CAMERA URL
+            </span>
+            <button
+              onClick={copyToClipboard}
+              className="text-[11px] uppercase tracking-[0.15em] text-white hover:underline underline-offset-4 cursor-pointer"
+            >
+              {copied ? "TERSALIN ✓" : "SALIN TAUTAN"}
+            </button>
+          </div>
+          <code className="block overflow-x-auto text-xs text-white/90 bg-black p-3 border border-white/10 font-mono">
+            {cameraUrl}
           </code>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex w-full flex-col gap-3">
+        {/* Actions per DESIGN.md (Ghost Buttons) */}
+        <div className="flex w-full flex-col gap-4">
           <Link
             href={`/events/${eventId}/camera`}
-            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-6 py-4 font-semibold text-white shadow-lg shadow-purple-500/25 transition hover:shadow-xl active:scale-[0.97]"
+            className="btn-ghost w-full"
           >
-            📸 Buka Kamera
+            BUKA KAMERA INSTAN →
           </Link>
+
           <Link
             href={`/events/${eventId}`}
-            className="flex items-center justify-center gap-2 rounded-xl border-2 border-zinc-200 px-6 py-4 font-semibold transition hover:bg-zinc-50 active:scale-[0.97] dark:border-zinc-700 dark:hover:bg-zinc-900"
+            className="btn-ghost-ash w-full"
           >
-            🖼️ Lihat Album
+            LIHAT LIVE ALBUM
           </Link>
+
           <Link
             href="/dashboard"
-            className="text-center text-sm text-zinc-500 underline transition hover:text-zinc-800 dark:hover:text-zinc-300"
+            className="text-center text-xs uppercase tracking-[0.188em] text-[#cfcfcf] hover:text-white transition mt-2 underline underline-offset-4"
           >
-            ← Kembali ke daftar acara
+            ← KEMBALI KE DAFTAR ACARA
           </Link>
         </div>
       </main>
@@ -91,30 +132,33 @@ export default function CreateEventPage() {
 
   /* ---- Create form ---- */
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col justify-center gap-8 p-6 sm:p-8">
+    <main className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-xl flex-col justify-center p-6 sm:p-12 text-[#ffffff]">
       {/* Header */}
-      <div className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 text-3xl">
-          🎉
-        </div>
-        <h1 className="text-2xl font-bold sm:text-3xl">Buat Acara Baru</h1>
-        <p className="mt-2 text-sm text-zinc-500">
-          Masukkan nama acara, lalu bagikan QR code ke tamu.
+      <div className="mb-8">
+        <span className="text-[11px] uppercase tracking-[0.25em] text-[#cfcfcf]">
+          DEPLOY NEW PORTAL
+        </span>
+        <h1 className="mt-2 font-['Unbounded'] text-2xl sm:text-4xl font-bold uppercase tracking-[0.067em] text-[#ffffff]">
+          BUAT ACARA BARU
+        </h1>
+        <p className="mt-3 text-xs sm:text-sm uppercase tracking-[0.132em] text-[#cfcfcf]">
+          Masukkan parameter nama acara untuk meng-generate link & QR kolaboratif.
         </p>
       </div>
 
-      {/* Form card */}
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      {/* Form Container per DESIGN.md: Carbon surface, 0px radius, 1px border */}
+      <div className="surface-carbon p-8 sm:p-10 border border-white/20">
         <label
           htmlFor="event-title"
-          className="mb-2 block text-sm font-medium text-zinc-600 dark:text-zinc-400"
+          className="block text-xs uppercase tracking-[0.188em] text-[#cfcfcf] mb-3"
         >
-          Nama Acara
+          NAMA ACARA // EVENT TITLE
         </label>
+
         <input
           id="event-title"
-          className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3.5 text-base outline-none transition focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:focus:border-purple-400 dark:focus:bg-zinc-900"
-          placeholder="Contoh: Pernikahan Rani & Bima"
+          className="w-full bg-[#000000] border border-white/30 px-5 py-4 text-sm text-[#ffffff] uppercase tracking-[0.12em] placeholder:text-[#666666] outline-none transition focus:border-white focus:ring-0"
+          placeholder="CONTOH: PERNIKAHAN RANI & BIMA"
           value={title}
           maxLength={120}
           onChange={(e) => setTitle(e.target.value)}
@@ -124,38 +168,43 @@ export default function CreateEventPage() {
             }
           }}
         />
-        <p className="mt-2 text-right text-xs text-zinc-400">
-          {title.length}/120
-        </p>
+
+        <div className="mt-2 flex justify-between text-[11px] uppercase tracking-[0.15em] text-[#666666]">
+          <span>MAKSIMAL 120 KARAKTER</span>
+          <span>{title.length}/120</span>
+        </div>
 
         {error && (
-          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-            {error}
+          <div className="mt-4 border border-white/40 bg-black p-4 text-xs text-white uppercase tracking-[0.1em]">
+            ERROR // {error}
           </div>
         )}
 
+        {/* Ghost CTA Button for submit */}
         <button
-          className="mt-4 w-full rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-6 py-4 font-semibold text-white shadow-lg shadow-purple-500/25 transition hover:shadow-xl hover:shadow-purple-500/30 active:scale-[0.97] disabled:opacity-50 disabled:shadow-none"
+          className="btn-ghost mt-8 w-full disabled:opacity-40 disabled:cursor-not-allowed"
           disabled={busy || title.trim().length === 0}
           onClick={submit}
         >
           {busy ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-              Membuat…
+            <span className="flex items-center justify-center gap-3">
+              <span className="inline-block h-3.5 w-3.5 animate-spin border border-white border-t-transparent" />
+              MEMPROSES INISIALISASI…
             </span>
           ) : (
-            "Buat Acara →"
+            "GENERATE QR CODE & ACARA →"
           )}
         </button>
       </div>
 
-      <Link
-        href="/dashboard"
-        className="text-center text-sm text-zinc-500 underline transition hover:text-zinc-800 dark:hover:text-zinc-300"
-      >
-        ← Kembali ke daftar acara
-      </Link>
+      <div className="mt-8 text-center">
+        <Link
+          href="/dashboard"
+          className="text-xs uppercase tracking-[0.188em] text-[#cfcfcf] hover:text-white transition underline underline-offset-4"
+        >
+          ← KEMBALI KE DAFTAR ACARA
+        </Link>
+      </div>
     </main>
   );
 }

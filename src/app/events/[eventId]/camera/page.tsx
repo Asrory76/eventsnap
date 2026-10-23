@@ -1,17 +1,15 @@
 "use client";
 
-// Halaman kamera tamu modern EventSnap — buka getUserMedia, jepret, upload ke Storage+Firestore.
-// Fitur:
-// - Viewfinder modern dengan grid overlay & corner markers
-// - Shutter button premium dengan ripple & haptic visual
-// - Switch kamera depan/belakang
-// - Batch upload dengan progress bar & status badge
-// - Integrasi galeri upload
-// - Review & delete sebelum kirim
 import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { getEvent, uploadPhoto, type EventDoc } from "@/lib/events";
-import { signIn } from "@/lib/auth";
+import { getEvent, uploadPhoto, signIn } from "@/lib/services";
+import { type EventDoc } from "@/types";
+import {
+  PicMeError,
+  QuotaExceededError,
+  EventClosedError,
+  InvalidMediaError,
+} from "@/lib/errors";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -26,7 +24,7 @@ type Shot = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Wrapper — unwrap params promise (App Router convention)            */
+/*  Wrapper — unwrap params promise                                    */
 /* ------------------------------------------------------------------ */
 export default function CameraPage({
   params,
@@ -42,18 +40,15 @@ export default function CameraPage({
 
 function LoadingScreen() {
   return (
-    <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-6">
+    <main className="flex min-h-[calc(100vh-5rem)] items-center justify-center p-6 text-white bg-black">
       <div className="flex flex-col items-center gap-4 text-center">
-        <div className="relative flex h-14 w-14 items-center justify-center">
-          <div className="absolute inset-0 animate-ping rounded-full bg-purple-500/20" />
-          <div className="h-10 w-10 animate-spin rounded-full border-3 border-purple-500/30 border-t-purple-600" />
-        </div>
+        <div className="h-10 w-10 border border-white border-t-transparent animate-spin" />
         <div>
-          <p className="font-semibold text-zinc-900 dark:text-zinc-100">
-            Menyiapkan Kamera…
+          <p className="font-['Unbounded'] text-sm uppercase tracking-[0.15em] text-white">
+            MENYIAPKAN OPTIK KAMERA…
           </p>
-          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-            Memuat detail acara & akses perangkat
+          <p className="mt-1 text-xs uppercase tracking-[0.1em] text-[#cfcfcf]">
+            MEMUAT DETAIL ACARA & AKSES PERANGKAT
           </p>
         </div>
       </div>
@@ -159,7 +154,6 @@ function CameraInner({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Mirror if user-facing
     if (facingMode === "user") {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
@@ -224,6 +218,13 @@ function CameraInner({
         );
       } catch (e) {
         console.error("Upload error:", e);
+        const message =
+          e instanceof PicMeError
+            ? e.message
+            : e instanceof Error
+            ? e.message
+            : "Gagal mengunggah foto ke album.";
+        setError(message);
         setShots((s) =>
           s.map((p) => (p.id === shotId ? { ...p, status: "error" } : p))
         );
@@ -244,7 +245,6 @@ function CameraInner({
     }
   }, [shots, uploadShot]);
 
-  // --- stats ---
   const pendingCount = shots.filter(
     (s) => s.status === "pending" || s.status === "error"
   ).length;
@@ -253,21 +253,22 @@ function CameraInner({
   // --- error screen ---
   if (error && !event) {
     return (
-      <main className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center p-6 text-center">
-        <div className="max-w-md rounded-2xl border border-red-200 bg-red-50/80 p-8 shadow-sm backdrop-blur-sm dark:border-red-900/40 dark:bg-red-950/20">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 text-2xl dark:bg-red-900/30">
-            ⚠️
-          </div>
-          <h2 className="mb-2 text-lg font-bold text-red-900 dark:text-red-200">
-            Terjadi Kesalahan
+      <main className="flex min-h-[calc(100vh-5rem)] flex-col items-center justify-center p-6 text-center text-white bg-black">
+        <div className="max-w-md surface-carbon p-8 border border-white/20">
+          <span className="text-[11px] uppercase tracking-[0.25em] text-[#cfcfcf]">
+            SYSTEM ALERT
+          </span>
+          <h2 className="mt-2 font-['Unbounded'] text-lg font-bold uppercase tracking-[0.067em] text-white">
+            TERJADI KESALAHAN
           </h2>
-          <p className="mb-6 text-sm text-red-700 dark:text-red-300">{error}</p>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            ← Kembali ke Beranda
-          </Link>
+          <p className="mt-3 text-xs uppercase tracking-[0.1em] text-[#cfcfcf] leading-relaxed">
+            {error}
+          </p>
+          <div className="mt-6">
+            <Link href="/" className="btn-ghost-sm">
+              ← KEMBALI KE BERANDA
+            </Link>
+          </div>
         </div>
       </main>
     );
@@ -276,7 +277,7 @@ function CameraInner({
   if (!event) return <LoadingScreen />;
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg flex-col p-4 sm:p-6">
+    <main className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-lg flex-col p-4 sm:p-6 text-white bg-black">
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -288,58 +289,67 @@ function CameraInner({
       />
 
       {/* ---------- HEADER ---------- */}
-      <header className="mb-4 flex items-center justify-between gap-3">
+      <header className="mb-4 flex items-center justify-between gap-3 border-b border-white/10 pb-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            <h1 className="truncate text-lg font-bold text-zinc-900 dark:text-zinc-100 sm:text-xl">
+            <span className="h-1.5 w-1.5 bg-white animate-pulse" />
+            <h1 className="truncate font-['Unbounded'] text-sm sm:text-base font-bold uppercase tracking-[0.08em] text-white">
               {event.title}
             </h1>
           </div>
-          <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 truncate text-[11px] uppercase tracking-[0.15em] text-[#cfcfcf]">
             {doneCount > 0
-              ? `🎉 ${doneCount} foto berhasil terkirim ke album`
-              : "Mode Kamera Tamu — Foto otomatis masuk ke album bersama"}
+              ? `${doneCount} FRAME TERSINKRONISASI KE ALBUM`
+              : "MODE KAMERA TAMU // LIVE SYNC"}
           </p>
         </div>
         <Link
           href={`/events/${eventId}`}
-          className="shrink-0 rounded-xl border border-zinc-200/80 bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm backdrop-blur-sm transition hover:bg-zinc-50 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          className="btn-ghost-ash text-xs py-1.5 px-3 shrink-0"
         >
-          Lihat Album ↗
+          ALBUM ↗
         </Link>
       </header>
 
       {/* ---------- ERROR BANNER ---------- */}
       {error && event && (
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-xs text-amber-800 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+        <div className="mb-4 flex items-center justify-between border border-white/40 bg-black p-3 text-xs uppercase tracking-[0.1em] text-white">
           <span>{error}</span>
           <button
-            className="ml-2 font-semibold underline"
+            className="ml-2 font-bold underline cursor-pointer"
             onClick={() => setError(null)}
           >
-            Tutup
+            TUTUP
           </button>
         </div>
       )}
 
-      {/* ---------- PRE-JOIN ONBOARDING SCREEN ---------- */}
+      {/* ---------- PRE-JOIN SCREEN ---------- */}
       {!joined && (
-        <div className="flex flex-1 flex-col items-center justify-center py-10">
-          <div className="relative mb-6">
-            <div className="absolute -inset-4 rounded-3xl bg-gradient-to-tr from-indigo-500/20 via-purple-500/20 to-pink-500/20 blur-xl" />
-            <div className="relative flex h-28 w-28 items-center justify-center rounded-3xl border border-zinc-200/80 bg-white/90 text-5xl shadow-xl backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/90">
-              📸
-            </div>
+        <div className="flex flex-1 flex-col items-center justify-center py-10 surface-carbon border border-white/20 p-8 my-auto">
+          <div className="mb-6 flex h-16 w-16 items-center justify-center border border-white/40 bg-black">
+            <svg
+              width="26"
+              height="26"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#ffffff"
+              strokeWidth="1.2"
+            >
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
           </div>
 
           <div className="mb-8 text-center">
-            <h2 className="mb-2 text-xl font-bold text-zinc-900 dark:text-zinc-100">
-              Abadikan Momen Acara
+            <span className="text-[11px] uppercase tracking-[0.25em] text-[#cfcfcf]">
+              CONNECT OPTICAL FEED
+            </span>
+            <h2 className="mt-2 font-['Unbounded'] text-lg font-bold uppercase tracking-[0.067em] text-white">
+              ABADIKAN MOMEN ACARA
             </h2>
-            <p className="max-w-xs text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-              Setiap foto yang kamu ambil akan langsung tersimpan di galeri
-              kolaboratif {event.title}.
+            <p className="mt-2 max-w-xs text-xs uppercase tracking-[0.132em] text-[#cfcfcf] leading-relaxed">
+              Setiap foto yang Anda ambil akan tersimpan otomatis ke galeri kolaboratif {event.title}.
             </p>
           </div>
 
@@ -349,18 +359,18 @@ function CameraInner({
                 setJoined(true);
                 void startCamera(facingMode);
               }}
-              className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-6 py-4 text-center font-bold text-white shadow-lg shadow-purple-500/25 transition hover:shadow-xl hover:shadow-purple-500/35 active:scale-[0.98]"
+              className="btn-ghost w-full"
             >
-              <span>📷 Buka Kamera Sekarang</span>
+              BUKA KAMERA SEKARANG
             </button>
             <button
               onClick={() => {
                 setJoined(true);
                 fileInputRef.current?.click();
               }}
-              className="flex items-center justify-center gap-2 rounded-2xl border border-zinc-200/90 bg-white/80 px-6 py-3.5 text-center text-sm font-semibold text-zinc-700 shadow-sm backdrop-blur-sm transition hover:bg-zinc-50 active:scale-[0.98] dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="btn-ghost-ash w-full"
             >
-              <span>🖼️ Unggah dari Galeri Foto</span>
+              UNGGAH DARI GALERI
             </button>
           </div>
         </div>
@@ -369,13 +379,13 @@ function CameraInner({
       {/* ---------- CAMERA VIEW ---------- */}
       {joined && (
         <div className="flex flex-1 flex-col">
-          <div className="relative mb-4 overflow-hidden rounded-3xl bg-zinc-950 shadow-2xl ring-1 ring-zinc-800/80">
+          <div className="relative mb-4 overflow-hidden border border-white/30 bg-black">
             {/* Viewfinder Video */}
             <video
               ref={videoRef}
               playsInline
               muted
-              className={`aspect-[3/4] w-full object-cover transition-transform duration-300 ${
+              className={`aspect-[3/4] w-full object-cover ${
                 facingMode === "user" ? "-scale-x-100" : ""
               }`}
             />
@@ -385,103 +395,125 @@ function CameraInner({
               <div className="absolute inset-0 z-30 bg-white transition-opacity duration-100" />
             )}
 
-            {/* Viewfinder Framing Grid & Overlay */}
+            {/* Viewfinder Framing Grid */}
             {cameraReady && showGrid && (
               <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3">
-                <div className="border-b border-r border-white/15" />
-                <div className="border-b border-r border-white/15" />
-                <div className="border-b border-white/15" />
-                <div className="border-b border-r border-white/15" />
-                <div className="border-b border-r border-white/15" />
-                <div className="border-b border-white/15" />
-                <div className="border-r border-white/15" />
-                <div className="border-r border-white/15" />
+                <div className="border-b border-r border-white/10" />
+                <div className="border-b border-r border-white/10" />
+                <div className="border-b border-white/10" />
+                <div className="border-b border-r border-white/10" />
+                <div className="border-b border-r border-white/10" />
+                <div className="border-b border-white/10" />
+                <div className="border-r border-white/10" />
+                <div className="border-r border-white/10" />
                 <div />
               </div>
             )}
 
-            {/* Corner Viewfinder Indicators */}
+            {/* Sharp Architectural Corner Reticles (0px radius) */}
             {cameraReady && (
-              <div className="pointer-events-none absolute inset-4 z-10">
-                <div className="absolute left-0 top-0 h-4 w-4 border-l-2 border-t-2 border-white/60 rounded-tl" />
-                <div className="absolute right-0 top-0 h-4 w-4 border-r-2 border-t-2 border-white/60 rounded-tr" />
-                <div className="absolute bottom-0 left-0 h-4 w-4 border-b-2 border-l-2 border-white/60 rounded-bl" />
-                <div className="absolute bottom-0 right-0 h-4 w-4 border-b-2 border-r-2 border-white/60 rounded-br" />
+              <div className="pointer-events-none absolute inset-5 z-10">
+                <div className="absolute left-0 top-0 h-4 w-4 border-l-2 border-t-2 border-white/80" />
+                <div className="absolute right-0 top-0 h-4 w-4 border-r-2 border-t-2 border-white/80" />
+                <div className="absolute bottom-0 left-0 h-4 w-4 border-b-2 border-l-2 border-white/80" />
+                <div className="absolute bottom-0 right-0 h-4 w-4 border-b-2 border-r-2 border-white/80" />
               </div>
             )}
 
-            {/* Top Toolbar overlay */}
+            {/* Top Toolbar Overlay */}
             {cameraReady && (
-              <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent">
+              <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
                 <button
                   onClick={() => setShowGrid(!showGrid)}
-                  className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold transition backdrop-blur-md ${
+                  className={`flex h-8 w-8 items-center justify-center border text-[11px] font-mono transition cursor-pointer ${
                     showGrid
-                      ? "bg-white/30 text-white"
-                      : "bg-black/30 text-white/60"
+                      ? "border-white bg-white/20 text-white"
+                      : "border-white/30 bg-black/40 text-white/60"
                   }`}
                   title="Toggle Grid"
                 >
-                  #
+                  GRID
                 </button>
-                <div className="rounded-full bg-black/40 px-3 py-1 text-[11px] font-medium text-white/80 backdrop-blur-md">
-                  {facingMode === "environment" ? "Belakang" : "Depan (Selfie)"}
+                <div className="border border-white/30 bg-black/60 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
+                  {facingMode === "environment" ? "REAR OPTICS" : "FRONT (SELFIE)"}
                 </div>
               </div>
             )}
 
             {/* Inactive camera placeholder */}
             {!cameraReady && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950 p-6 text-zinc-400">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 text-3xl">
-                  📷
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black p-6 text-center">
+                <div className="flex h-14 w-14 items-center justify-center border border-white/40">
+                  <span className="text-white text-xl">📷</span>
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-zinc-200">
-                    Kamera belum aktif
+                <div>
+                  <p className="font-['Unbounded'] text-xs uppercase tracking-[0.15em] text-white">
+                    KAMERA BELUM AKTIF
                   </p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Klik tombol di bawah untuk mengaktifkan izin kamera
+                  <p className="mt-1 text-[11px] uppercase tracking-[0.1em] text-[#cfcfcf]">
+                    IZINKAN AKSES KAMERA PADA BROWSER
                   </p>
                 </div>
                 <button
-                  className="rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-2.5 text-xs font-bold text-white shadow-md transition hover:opacity-90 active:scale-95"
+                  className="btn-ghost-sm mt-2"
                   onClick={() => void startCamera(facingMode)}
                 >
-                  Aktifkan Kamera
+                  AKTIFKAN KAMERA
                 </button>
               </div>
             )}
 
             {/* Bottom Controls Bar */}
             {cameraReady && (
-              <div className="absolute inset-x-0 bottom-0 z-20 flex items-center justify-around bg-gradient-to-t from-black/80 via-black/40 to-transparent px-6 pb-6 pt-12">
+              <div className="absolute inset-x-0 bottom-0 z-20 flex items-center justify-around bg-gradient-to-t from-black/90 via-black/50 to-transparent px-6 pb-6 pt-10">
                 {/* Gallery Picker */}
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-xl text-white backdrop-blur-md transition hover:bg-white/30 active:scale-90"
+                  className="flex h-11 w-11 items-center justify-center border border-white/30 bg-black/60 text-white hover:border-white transition cursor-pointer"
                   title="Pilih dari Galeri"
                 >
-                  🖼️
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                  >
+                    <rect x="3" y="3" width="18" height="18" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
                 </button>
 
-                {/* Shutter Button */}
+                {/* Shutter Button (Sharp geometric aesthetic) */}
                 <button
                   onClick={snap}
-                  className="group relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-white/90 bg-white/20 backdrop-blur-md transition active:scale-95"
+                  className="group relative flex h-20 w-20 items-center justify-center border-2 border-white bg-black/40 cursor-pointer active:scale-95 transition"
                   title="Ambil Foto"
                   aria-label="Ambil foto"
                 >
-                  <div className="h-14 w-14 rounded-full bg-white transition group-hover:scale-95 group-active:scale-90 shadow-lg" />
+                  <div className="h-14 w-14 bg-white transition group-hover:scale-95 group-active:scale-90" />
                 </button>
 
                 {/* Switch Camera */}
                 <button
                   onClick={flipCamera}
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-xl text-white backdrop-blur-md transition hover:bg-white/30 active:scale-90"
+                  className="flex h-11 w-11 items-center justify-center border border-white/30 bg-black/60 text-white hover:border-white transition cursor-pointer"
                   title="Ganti Kamera"
                 >
-                  🔄
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                  >
+                    <polyline points="1 4 1 10 7 10" />
+                    <polyline points="23 20 23 14 17 14" />
+                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+                  </svg>
                 </button>
               </div>
             )}
@@ -489,91 +521,83 @@ function CameraInner({
 
           {/* ---------- SHOTS QUEUE / REVIEW ---------- */}
           {shots.length > 0 && (
-            <section className="mt-2 rounded-3xl border border-zinc-200/80 bg-white/80 p-4 shadow-sm backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/80">
-              <div className="mb-3 flex items-center justify-between">
+            <section className="surface-carbon p-5 border border-white/20">
+              <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
                 <div>
-                  <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                    Antrean Foto ({shots.length})
+                  <h2 className="font-['Unbounded'] text-xs font-semibold uppercase tracking-[0.1em] text-white">
+                    ANTREAN FRAME ({shots.length})
                   </h2>
-                  <p className="text-[11px] text-zinc-500">
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-[#cfcfcf]">
                     {pendingCount > 0
-                      ? `${pendingCount} foto siap diunggah`
-                      : "Semua foto telah tersimpan"}
+                      ? `${pendingCount} FRAME SIAP DIUNGGAH`
+                      : "SELURUH FRAME TERSINKRONISASI"}
                   </p>
                 </div>
                 {pendingCount > 0 && (
                   <button
-                    className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-purple-500/20 transition hover:shadow-lg disabled:opacity-50"
+                    className="btn-ghost-sm text-xs py-1.5 px-3"
                     disabled={uploading}
                     onClick={() => void uploadAll()}
                   >
-                    {uploading ? (
-                      <>
-                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                        Mengunggah…
-                      </>
-                    ) : (
-                      `🚀 Kirim Semua (${pendingCount})`
-                    )}
+                    {uploading ? "MENGUNGGAH…" : `KIRIM SEMUA (${pendingCount})`}
                   </button>
                 )}
               </div>
 
-              <div className="flex max-h-60 flex-col gap-2 overflow-y-auto pr-1">
+              <div className="flex max-h-56 flex-col gap-2 overflow-y-auto pr-1">
                 {shots.map((s) => (
                   <div
                     key={s.id}
-                    className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-zinc-50/70 p-2.5 transition dark:border-zinc-800/60 dark:bg-zinc-800/40"
+                    className="flex items-center gap-3 bg-black p-2.5 border border-white/10"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={s.previewUrl}
                       alt="hasil jepretan"
-                      className="h-14 w-14 rounded-xl object-cover ring-1 ring-black/5"
+                      className="h-12 w-12 object-cover border border-white/20"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         {s.status === "pending" && (
-                          <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                            Siap Kirim
+                          <span className="text-[10px] font-mono tracking-[0.15em] uppercase text-white/80">
+                            [SIAP KIRIM]
                           </span>
                         )}
                         {s.status === "uploading" && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
-                            <span className="h-2 w-2 animate-spin rounded-full border border-blue-600 border-t-transparent" />
-                            Mengunggah…
+                          <span className="text-[10px] font-mono tracking-[0.15em] uppercase text-cyan-400">
+                            [MENGUNGGAH…]
                           </span>
                         )}
                         {s.status === "done" && (
-                          <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                            ✓ Berhasil Masuk Album
+                          <span className="text-[10px] font-mono tracking-[0.15em] uppercase text-white">
+                            [TERSINKRON ✓]
                           </span>
                         )}
                         {s.status === "error" && (
-                          <span className="inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-400">
-                            ✕ Gagal Unggah
+                          <span className="text-[10px] font-mono tracking-[0.15em] uppercase text-red-400">
+                            [GAGAL UNGGAH]
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 truncate text-[11px] text-zinc-500 dark:text-zinc-400">
+                      <p className="mt-1 truncate font-mono text-[10px] text-[#666666]">
                         {s.id}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                       {(s.status === "pending" || s.status === "error") && (
                         <button
-                          className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                          className="btn-ghost-sm text-[10px] py-1 px-2.5"
                           disabled={uploading}
                           onClick={() => void uploadShot(s.id)}
                         >
-                          Kirim
+                          KIRIM
                         </button>
                       )}
                       {s.status !== "uploading" && (
                         <button
                           onClick={() => removeShot(s.id)}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+                          className="flex h-6 w-6 items-center justify-center border border-white/20 text-xs text-white/70 hover:border-white hover:text-white"
                           title="Hapus"
                         >
                           ✕
@@ -584,13 +608,12 @@ function CameraInner({
                 ))}
               </div>
 
-              <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800/80 text-center">
+              <div className="mt-4 pt-3 border-t border-white/10 text-center">
                 <Link
                   href={`/events/${eventId}`}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-600 transition hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+                  className="text-xs uppercase tracking-[0.188em] text-[#cfcfcf] hover:text-white underline underline-offset-4"
                 >
-                  <span>Buka galeri album sekarang</span>
-                  <span>→</span>
+                  BUKA GALERI ALBUM SEKARANG →
                 </Link>
               </div>
             </section>

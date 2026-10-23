@@ -1,73 +1,241 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Unbounded:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --accent: #7c3aed;
-  --accent-light: #a78bfa;
-  --surface: #f4f4f5;
-  --surface-hover: #e4e4e7;
-  --border: #e4e4e7;
+  /* Colors */
+  --color-gold: #B88E4F;
+  --color-gold-hover: #A57B3F;
+  --color-gold-light: #F4EBD9;
+  --color-gold-glow: rgba(184, 142, 79, 0.25);
+  
+  --color-dark-bg: #141210;
+  --color-dark-surface: #1C1917;
+  --color-dark-card: #24201D;
+  --color-dark-border: rgba(255, 255, 255, 0.1);
+
+  --color-cream-bg: #FBF8F4;
+  --color-cream-surface: #FFFFFF;
+  --color-cream-subtle: #F6F1E9;
+  --color-cream-border: #E8E0D5;
+
+  --color-text-dark: #201C19;
+  --color-text-muted: #6B635A;
+  --color-text-light: #FFFFFF;
+  --color-text-subtle: #A8A199;
+
+  /* Typography */
+  --font-serif: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-unbounded: 'Unbounded', system-ui, sans-serif;
+
+  --background: #141210;
+  --foreground: #FFFFFF;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme {
+  --font-serif: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-unbounded: 'Unbounded', system-ui, sans-serif;
+  
+  --color-momen-gold: #B88E4F;
+  --color-momen-gold-hover: #A57B3F;
+  --color-momen-dark: #141210;
+  --color-momen-cream: #FBF8F4;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --accent: #a78bfa;
-    --accent-light: #c4b5fd;
-    --surface: #18181b;
-    --surface-hover: #27272a;
-    --border: #27272a;
-  }
+* {
+  box-sizing: border-box;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+html, body {
+  background-color: #141210;
+  color: #FFFFFF;
+  font-family: var(--font-sans);
+  min-height: 100%;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Smooth page transitions */
-main {
-  animation: fadeIn 0.4s ease-out;
+/* Elegant serif utility */
+.font-serif-luxury {
+  font-family: var(--font-serif);
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Carbon surface per DESIGN.md (Sharp architectural aesthetic) */
+.surface-carbon {
+  background-color: #111111;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Ghost Buttons per DESIGN.md */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.75rem;
+  background-color: #FFFFFF;
+  color: #000000;
+  border: 1px solid #FFFFFF;
+  font-family: var(--font-unbounded);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-ghost:hover {
+  background-color: #000000;
+  color: #FFFFFF;
+  border-color: #FFFFFF;
+}
+.btn-ghost:active {
+  transform: scale(0.99);
+}
+
+.btn-ghost-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  background-color: transparent;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  font-family: var(--font-unbounded);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-ghost-sm:hover {
+  background-color: #FFFFFF;
+  color: #000000;
+  border-color: #FFFFFF;
+}
+
+.btn-ghost-ash {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.75rem;
+  background-color: #181818;
+  color: #CFCFCF;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-family: var(--font-unbounded);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-ghost-ash:hover {
+  background-color: #242424;
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Luxury Gold Button */
+.btn-momen-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: #B88E4F;
+  color: #FFFFFF;
+  padding: 0.75rem 1.75rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 14px 0 rgba(184, 142, 79, 0.35);
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-momen-gold:hover {
+  background-color: #A57B3F;
+  box-shadow: 0 6px 20px 0 rgba(184, 142, 79, 0.45);
+  transform: translateY(-1px);
+}
+.btn-momen-gold:active {
+  transform: translateY(0);
+}
+
+/* Glass Outline Button */
+.btn-momen-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+  padding: 0.75rem 1.75rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  transition: all 0.25s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-momen-outline:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Light theme outline button */
+.btn-momen-outline-dark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: transparent;
+  border: 1px solid #D8CFC4;
+  color: #201C19;
+  padding: 0.75rem 1.75rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+.btn-momen-outline-dark:hover {
+  background-color: #F3ECE2;
+  border-color: #B88E4F;
+  color: #B88E4F;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #141210;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: #3A342E;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--surface-hover);
+  background: #B88E4F;
 }
 
-/* Selection color */
 ::selection {
-  background: var(--accent);
-  color: white;
+  background: #B88E4F;
+  color: #FFFFFF;
 }

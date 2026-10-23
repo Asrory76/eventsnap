@@ -1,6 +1,3 @@
-// Firebase client SDK bootstrap.
-// NOTE: Firebase web config is public by design — real security is enforced by
-// Firestore Security Rules + Storage Rules, never by hiding these values.
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
@@ -13,7 +10,17 @@ export type FirebaseClients = {
   storage: FirebaseStorage;
 };
 
-export function initFirebase(): FirebaseClients {
+// Global singleton cache untuk mencegah re-inisialisasi ganda saat Fast Refresh / Turbopack
+declare global {
+  // eslint-disable-next-line no-var
+  var __firebase_clients__: FirebaseClients | undefined;
+}
+
+export function getFirebase(): FirebaseClients {
+  if (globalThis.__firebase_clients__) {
+    return globalThis.__firebase_clients__;
+  }
+
   const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "",
@@ -30,5 +37,18 @@ export function initFirebase(): FirebaseClients {
   }
 
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  return { app, auth: getAuth(app), db: getFirestore(app), storage: getStorage(app) };
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+
+  const clients: FirebaseClients = { app, auth, db, storage };
+
+  if (process.env.NODE_ENV !== "production") {
+    globalThis.__firebase_clients__ = clients;
+  }
+
+  return clients;
 }
+
+// Backward compatibility alias
+export const initFirebase = getFirebase;
