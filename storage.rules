@@ -1,7 +1,8 @@
 rules_version = '2';
 
-// PicMe (EventSnap) — Production-Grade Storage Security Rules
-// Membatasi unggahan hanya untuk format gambar valid, batas ukuran file 10MB, dan isolasi folder event
+// PicMe (EventSnap) — Production-Grade Cross-Service Storage Security Rules
+// Membatasi unggahan dengan cross-service validation ke Cloud Firestore:
+// Memastikan event terdaftar dan berstatus aktif sebelum file fisik diterima di Cloud Storage.
 
 service firebase.storage {
   match /b/{bucket}/o {
@@ -15,22 +16,34 @@ service firebase.storage {
         && request.resource.contentType.matches('image/(jpeg|png|webp|heic|heif|gif)');
     }
 
+    // Cross-Service Firestore Helper: Validasi status event di database
+    function isEventActiveInFirestore(eventId) {
+      return firestore.exists(/databases/(default)/documents/events/$(eventId))
+        && firestore.get(/databases/(default)/documents/events/$(eventId)).data.status == 'active';
+    }
+
     // Path terstruktur utama untuk foto event: events/{eventId}/photos/{fileName}
     match /events/{eventId}/photos/{fileName} {
-      // Foto publik untuk ditampilkan di Live Stream Wall & Galeri Tamu
+      // Foto publik untuk Live Stream Wall & Galeri Tamu
       allow read: if true;
 
-      // Unggah foto: harus authenticated (mendukung anonymous auth), maks 10MB, MIME type valid
-      allow write: if isAuthenticated() && isValidImage(10);
+      // Unggah foto: user terautentikasi, ukuran <= 10MB, tipe gambar valid,
+      // dan dokumen event di Firestore HARUS berstatus 'active'
+      allow write: if isAuthenticated()
+        && isValidImage(10)
+        && isEventActiveInFirestore(eventId);
 
-      // Hapus foto: diizinkan bagi user terautentikasi (untuk mekanisme rollback atomik atau hapus foto sendiri/host)
+      // Hapus foto: diizinkan bagi user terautentikasi (untuk rollback atomik atau hapus foto)
       allow delete: if isAuthenticated();
     }
 
     // Path backward-compatibility: events/{eventId}/{uid}/{fileName}
     match /events/{eventId}/{uid}/{fileName} {
       allow read: if true;
-      allow write: if isAuthenticated() && request.auth.uid == uid && isValidImage(10);
+      allow write: if isAuthenticated()
+        && request.auth.uid == uid
+        && isValidImage(10)
+        && isEventActiveInFirestore(eventId);
       allow delete: if isAuthenticated() && request.auth.uid == uid;
     }
   }

@@ -15,8 +15,10 @@ import {
   limit,
 } from "firebase/firestore";
 import { getFirebase } from "@/lib/firebase";
+import { ref, deleteObject } from "firebase/storage";
 import {
   eventConverter,
+  photoConverter,
   type EventDoc,
   type EventStatus,
   type CreateEventInput,
@@ -413,7 +415,9 @@ export function subscribeEvent(
 }
 
 /**
- * Hapus event secara atomik menggunakan WriteBatch untuk menjamin integritas data (Host only).
+ * Hapus event secara cascade: membersihkan dokumen foto, komentar terkait,
+ * file fisik di Firebase Storage, dan dokumen event itu sendiri (Host only).
+ * Mencegah file yatim (orphaned files) dan menjaga kebersihan penyimpanan cloud.
  *
  * @param eventId - ID event yang akan dihapus
  */
@@ -422,7 +426,7 @@ export async function deleteEvent(eventId: string): Promise<void> {
   if (!cleanId) throw new ValidationError("ID event tidak boleh kosong.");
 
   try {
-    const { db, auth } = getFirebase();
+    const { db, storage, auth } = getFirebase();
     const currentUid = auth.currentUser?.uid;
     if (!currentUid) throw new UnauthorizedError();
 
@@ -430,15 +434,52 @@ export async function deleteEvent(eventId: string): Promise<void> {
     const existing = await getDoc(eventRef);
 
     if (!existing.exists()) return;
-    if (existing.data().hostId !== currentUid) {
+    const eventData = existing.data();
+    if (eventData.hostId !== currentUid) {
       throw new UnauthorizedError("Hanya Host yang dapat menghapus event ini.");
     }
 
-    // Gunakan writeBatch untuk atomicity
-    const batch = writeBatch(db);
-    batch.delete(eventRef);
-    await batch.commit();
+    // 1. Ambil seluruh dokumen foto dalam event
+    const photosQuery = collection(db, "events", cleanId, "photos").withConverter(photoConverter);
+    const photosSnap = await getDocs(photosQuery);
+
+    // 2. Bersihkan file fisik di Firebase Storage secara paralel
+    const storagePromises = photosSnap.docs.map(async (docSnap) => {
+      const p = docSnap.data();
+      if (p.storagePath) {
+        try {
+          await deleteObject(ref(storage, p.storagePath));
+        } catch {
+          // File mungkin sudah dihapus sebelumnya
+        }
+      }
+    });
+
+    // 3. Ambil seluruh dokumen komentar dalam event
+    const commentsQuery = collection(db, "events", cleanId, "comments");
+    const commentsSnap = await getDocs(commentsQuery);
+
+    // Tunggu pembersihan Storage selesai
+    await Promise.allSettled(storagePromises);
+
+    // 4. Batch delete seluruh dokumen Firestore (dipecah per 400 docs untuk batas batch 500)
+    const allRefsToDelete = [
+      ...photosSnap.docs.map((d) => d.ref),
+      ...commentsSnap.docs.map((d) => d.ref),
+      eventRef,
+    ];
+
+    const CHUNK_SIZE = 400;
+    for (let i = 0; i < allRefsToDelete.length; i += CHUNK_SIZE) {
+      const batch = writeBatch(db);
+      const chunk = allRefsToDelete.slice(i, i + CHUNK_SIZE);
+      for (const targetRef of chunk) {
+        batch.delete(targetRef);
+      }
+      await batch.commit();
+    }
   } catch (error) {
     throw handleFirebaseError(error);
   }
 }
+

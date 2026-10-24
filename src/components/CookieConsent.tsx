@@ -23,18 +23,18 @@ export default function CookieConsent() {
   return (
     <aside
       aria-label="Cookie consent banner"
-      className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 sm:max-w-md z-50 rounded-2xl border border-white/15 bg-[#1B1815]/95 p-4 shadow-2xl backdrop-blur-md"
+      className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 sm:max-w-md z-50 rounded-2xl border border-[#E5DAC9] bg-[#FAF6F0]/95 p-4 shadow-xl backdrop-blur-md"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs text-white/90 leading-relaxed font-light">
-            Kami menggunakan cookie dan penyimpanan lokal demi memastikan pengunggahan momen pernikahan berjalan lancar dan optimal.
+          <p className="text-xs text-[#5C4E43] leading-relaxed font-normal">
+            Kami menggunakan cookie dan penyimpanan lokal demi memastikan pengunggahan foto acara berlangsung cepat, aman, dan tanpa hambatan.
           </p>
           <div className="mt-2.5 flex items-center gap-3">
             <button
               type="button"
               onClick={dismiss}
-              className="rounded-full bg-[#BA935D] px-4 py-1.5 text-xs font-medium text-white transition hover:bg-[#A8824E]"
+              className="btn-gold-gradient rounded-xl px-4 py-1.5 text-xs font-medium text-white shadow-xs"
             >
               Saya Mengerti
             </button>
@@ -43,7 +43,7 @@ export default function CookieConsent() {
         <button
           onClick={dismiss}
           aria-label="Tutup"
-          className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-white/60 hover:text-white"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#6E5D4F] hover:text-[#231C16]"
         >
           ✕
         </button>

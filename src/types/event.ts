@@ -21,6 +21,7 @@ export interface EventDoc {
   usedPhotoQuota: number;
   isModerationEnabled: boolean;
   coverUrl?: string;
+  pin?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -34,6 +35,7 @@ export interface CreateEventInput {
   coverUrl?: string;
   slug?: string;
   status?: EventStatus;
+  pin?: string;
 }
 
 export interface UpdateEventInput {
@@ -44,6 +46,7 @@ export interface UpdateEventInput {
   isModerationEnabled?: boolean;
   coverUrl?: string;
   slug?: string;
+  pin?: string;
 }
 
 export const eventConverter: FirestoreDataConverter<EventDoc> = {
@@ -61,6 +64,7 @@ export const eventConverter: FirestoreDataConverter<EventDoc> = {
       data.isModerationEnabled = event.isModerationEnabled;
     }
     if (event.coverUrl !== undefined) data.coverUrl = event.coverUrl;
+    if (event.pin !== undefined) data.pin = event.pin;
 
     if (event.createdAt !== undefined) {
       data.createdAt = event.createdAt;
@@ -89,6 +93,7 @@ export const eventConverter: FirestoreDataConverter<EventDoc> = {
       usedPhotoQuota: typeof data.usedPhotoQuota === "number" ? data.usedPhotoQuota : 0,
       isModerationEnabled: Boolean(data.isModerationEnabled),
       coverUrl: data.coverUrl as string | undefined,
+      pin: data.pin as string | undefined,
       createdAt: data.createdAt as Timestamp,
       updatedAt: data.updatedAt as Timestamp,
     };

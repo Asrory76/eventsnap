@@ -1,12 +1,12 @@
 rules_version = '2';
 
 // PicMe (EventSnap) — Production-Grade Firestore Security Rules
-// Menjaga integritas data multi-tenant, kuota foto atomik, dan otorisasi Host vs Tamu (Guest/Anonymous)
+// Menjaga integritas data multi-tenant, kuota foto atomik, otorisasi, dan validasi anti-spam
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Functions Standar ---
+    // --- Helper Functions Standar & Anti-Spam ---
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -23,6 +23,10 @@ service cloud.firestore {
       return resource.data;
     }
 
+    function validString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
     function isEventHost(eventData) {
       return isAuthenticated() && (
         request.auth.uid == eventData.hostId ||
@@ -36,24 +40,28 @@ service cloud.firestore {
 
     // --- Events Collection ---
     match /events/{eventId} {
-      // Siapa saja (termasuk tamu yang scan QR) dapat membaca informasi event
+      // Siapa saja (termasuk tamu scanning QR) dapat membaca info event
       allow read: if true;
 
-      // Hanya Host terautentikasi yang boleh membuat event baru dengan skema awal valid
+      // Hanya Host terautentikasi yang boleh membuat event baru
+      // Validasi skema ketat & anti-spam (timestamp sinkron request.time)
       allow create: if isAuthenticated()
         && (incomingData().hostId == request.auth.uid || incomingData().ownerUid == request.auth.uid)
-        && incomingData().title is string
-        && incomingData().title.size() > 0
-        && incomingData().title.size() <= 120
+        && validString(incomingData().title, 1, 120)
+        && (!('description' in incomingData()) || incomingData().description == null || validString(incomingData().description, 0, 1000))
+        && (!('slug' in incomingData()) || incomingData().slug == null || validString(incomingData().slug, 1, 80))
+        && (!('pin' in incomingData()) || incomingData().pin == null || validString(incomingData().pin, 0, 20))
         && incomingData().maxPhotoQuota is int
         && incomingData().maxPhotoQuota > 0
+        && incomingData().maxPhotoQuota <= 50000
         && incomingData().usedPhotoQuota is int
-        && incomingData().usedPhotoQuota == 0;
+        && incomingData().usedPhotoQuota == 0
+        && incomingData().createdAt == request.time;
 
       // Update event:
       // 1. Host dapat mengubah konfigurasi event apa pun
-      // 2. Transaksi upload foto oleh tamu: hanya boleh menambah usedPhotoQuota jika event aktif & belum penuh
-      // 3. Transaksi hapus foto oleh tamu/host: hanya boleh mengurangi usedPhotoQuota
+      // 2. Transaksi upload foto tamu: increment usedPhotoQuota atomik
+      // 3. Transaksi hapus foto: decrement usedPhotoQuota atomik
       allow update: if isEventHost(existingData())
         || (
           isAuthenticated()
@@ -78,22 +86,35 @@ service cloud.firestore {
         allow read: if true;
 
         // Unggah foto oleh Tamu atau Host:
-        // - Harus terautentikasi (bisa Anonymous Auth atau Google Auth)
-        // - ID pengunggah sesuai dengan token sesi aktif
+        // - Harus terautentikasi (Anonymous atau Akun terdaftar)
+        // - ID pengunggah sesuai sesi aktif
         // - Event harus berstatus 'active'
-        // - Kuota event belum penuh
+        // - Kuota belum terpenuhi
+        // - Metadata media & anti-spam tervalidasi
         allow create: if isAuthenticated()
           && incomingData().uploadedBy == request.auth.uid
           && incomingData().eventId == eventId
           && incomingData().storagePath is string
+          && incomingData().storagePath.size() > 0
+          && incomingData().storagePath.size() <= 300
           && incomingData().url is string
+          && incomingData().url.size() > 0
+          && incomingData().url.size() <= 1000
+          && (!('caption' in incomingData()) || incomingData().caption == null || validString(incomingData().caption, 0, 500))
+          && (!('uploaderName' in incomingData()) || incomingData().uploaderName == null || validString(incomingData().uploaderName, 0, 50))
+          && incomingData().fileSize is int
+          && incomingData().fileSize > 0
+          && incomingData().fileSize <= 10 * 1024 * 1024
+          && incomingData().mimeType is string
+          && incomingData().mimeType.matches('image/(jpeg|png|webp|heic|heif|gif)')
+          && incomingData().createdAt == request.time
           && getEvent(eventId).status == 'active'
           && getEvent(eventId).usedPhotoQuota < getEvent(eventId).maxPhotoQuota;
 
         // Update foto:
-        // 1. Host dapat memperbarui status foto (moderasi: approved/rejected)
-        // 2. Tamu/Pengguna dapat memperbarui counter komentar secara atomik saat menambah/menghapus ucapan
-        // 3. Tamu/Pengguna dapat memperbarui likesCount (+1 / -1)
+        // 1. Host untuk moderasi (misal status approved/rejected)
+        // 2. Tamu untuk counter komentar atomik (+1 / -1)
+        // 3. Tamu untuk counter like atomik (+1 / -1)
         allow update: if isEventHost(getEvent(eventId))
           || (
             isAuthenticated()
@@ -107,7 +128,7 @@ service cloud.firestore {
             && (incomingData().likesCount == existingData().likesCount + 1 || incomingData().likesCount == existingData().likesCount - 1)
           );
 
-        // Hapus foto: Hanya Host event ATAU tamu pemilik foto yang bersangkutan
+        // Hapus foto: Host event ATAU tamu pemilik foto yang bersangkutan
         allow delete: if isEventHost(getEvent(eventId))
           || (isAuthenticated() && existingData().uploadedBy == request.auth.uid);
       }
@@ -117,16 +138,19 @@ service cloud.firestore {
         // Komentar dan ucapan selamat dapat dibaca publik di Live Stream Wall
         allow read: if true;
 
-        // Tambah ucapan/komentar: tamu terautentikasi, event harus aktif, teks 1-500 karakter
+        // Tambah komentar/ucapan:
+        // - Tamu terautentikasi
+        // - Event berstatus 'active'
+        // - Validasi anti-spam (pesan 1-500 karakter, nama 1-50 karakter, createdAt == request.time)
         allow create: if isAuthenticated()
           && incomingData().authorUid == request.auth.uid
           && incomingData().eventId == eventId
-          && incomingData().message is string
-          && incomingData().message.size() > 0
-          && incomingData().message.size() <= 500
+          && validString(incomingData().message, 1, 500)
+          && (!('authorName' in incomingData()) || incomingData().authorName == null || validString(incomingData().authorName, 1, 50))
+          && incomingData().createdAt == request.time
           && getEvent(eventId).status == 'active';
 
-        // Update komentar: tidak diizinkan untuk menjaga keaslian live feed
+        // Update komentar tidak diizinkan untuk menjaga keaslian feed live
         allow update: if false;
 
         // Hapus komentar: Host event atau pembuat komentar

@@ -1,46 +1,45 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Unbounded:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  /* Colors */
-  --color-gold: #B88E4F;
-  --color-gold-hover: #A57B3F;
-  --color-gold-light: #F4EBD9;
-  --color-gold-glow: rgba(184, 142, 79, 0.25);
-  
-  --color-dark-bg: #141210;
-  --color-dark-surface: #1C1917;
-  --color-dark-card: #24201D;
-  --color-dark-border: rgba(255, 255, 255, 0.1);
+  /* MomenKita Warm Editorial Color Palette */
+  --bg-cream: #F6F1E9;
+  --bg-cream-soft: #FAF6F0;
+  --bg-alabaster: #EFE8DC;
 
-  --color-cream-bg: #FBF8F4;
-  --color-cream-surface: #FFFFFF;
-  --color-cream-subtle: #F6F1E9;
-  --color-cream-border: #E8E0D5;
+  --text-espresso: #231C16;
+  --text-taupe: #6E5D4F;
+  --text-muted: #8E7D6F;
 
-  --color-text-dark: #201C19;
-  --color-text-muted: #6B635A;
-  --color-text-light: #FFFFFF;
-  --color-text-subtle: #A8A199;
+  --accent-gold-light: #BFA27E;
+  --accent-gold: #9E7B4F;
+  --accent-gold-dark: #7E5E36;
+  --accent-gold-gradient-from: #A68458;
+  --accent-gold-gradient-to: #805F35;
 
-  /* Typography */
-  --font-serif: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-unbounded: 'Unbounded', system-ui, sans-serif;
+  --card-surface: rgba(255, 252, 247, 0.78);
+  --card-border: rgba(158, 123, 79, 0.18);
+  --pill-surface: rgba(250, 246, 240, 0.88);
+  --pill-border: #E5DAC9;
 
-  --background: #141210;
-  --foreground: #FFFFFF;
+  --background: #F6F1E9;
+  --foreground: #231C16;
 }
 
 @theme {
-  --font-serif: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-unbounded: 'Unbounded', system-ui, sans-serif;
-  
-  --color-momen-gold: #B88E4F;
-  --color-momen-gold-hover: #A57B3F;
-  --color-momen-dark: #141210;
-  --color-momen-cream: #FBF8F4;
+  --font-serif: var(--font-serif), 'Playfair Display', Georgia, serif;
+  --font-sans: var(--font-sans), 'Plus Jakarta Sans', system-ui, sans-serif;
+
+  --color-momen-cream: #F6F1E9;
+  --color-momen-cream-soft: #FAF6F0;
+  --color-momen-alabaster: #EFE8DC;
+
+  --color-momen-espresso: #231C16;
+  --color-momen-taupe: #6E5D4F;
+  --color-momen-muted: #8E7D6F;
+
+  --color-momen-gold: #9E7B4F;
+  --color-momen-gold-dark: #7E5E36;
+  --color-momen-gold-light: #BFA27E;
 }
 
 * {
@@ -48,8 +47,8 @@
 }
 
 html, body {
-  background-color: #141210;
-  color: #FFFFFF;
+  background-color: #F6F1E9;
+  color: #231C16;
   font-family: var(--font-sans);
   min-height: 100%;
   overflow-x: hidden;
@@ -57,185 +56,80 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Elegant serif utility */
-.font-serif-luxury {
-  font-family: var(--font-serif);
+/* Pola Garis Lengkung Organik Emas Halus (Subtle Topographic Gold Curves) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.55;
+  background-image: 
+    radial-gradient(ellipse at 15% 10%, rgba(158, 123, 79, 0.08) 0%, transparent 45%),
+    radial-gradient(ellipse at 85% 85%, rgba(158, 123, 79, 0.09) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(229, 218, 201, 0.3) 0%, transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cpath d='M0 40 C 40 10, 80 70, 160 30 M0 80 C 50 50, 110 110, 160 70 M0 120 C 30 90, 100 150, 160 110' fill='none' stroke='%239E7B4F' stroke-width='0.65' stroke-opacity='0.12'/%3E%3C/svg%3E");
 }
 
-/* Carbon surface per DESIGN.md (Sharp architectural aesthetic) */
-.surface-carbon {
-  background-color: #111111;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+/* Font Class Helper */
+.font-serif {
+  font-family: var(--font-serif), 'Playfair Display', Georgia, serif;
 }
 
-/* Ghost Buttons per DESIGN.md */
-.btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.85rem 1.75rem;
-  background-color: #FFFFFF;
-  color: #000000;
-  border: 1px solid #FFFFFF;
-  font-family: var(--font-unbounded);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  text-decoration: none;
+.font-sans {
+  font-family: var(--font-sans), 'Plus Jakarta Sans', system-ui, sans-serif;
 }
-.btn-ghost:hover {
-  background-color: #000000;
+
+/* Glassmorphism Card Style */
+.glass-editorial-card {
+  background: rgba(255, 252, 247, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(158, 123, 79, 0.18);
+  box-shadow: 0 4px 20px -2px rgba(158, 123, 79, 0.06);
+}
+
+.glass-pill-nav {
+  background: rgba(250, 246, 240, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #E5DAC9;
+  box-shadow: 0 4px 16px -2px rgba(35, 28, 22, 0.05);
+}
+
+/* Gold Gradient Button */
+.btn-gold-gradient {
+  background: linear-gradient(135deg, #A68458 0%, #805F35 100%);
   color: #FFFFFF;
-  border-color: #FFFFFF;
-}
-.btn-ghost:active {
-  transform: scale(0.99);
-}
-
-.btn-ghost-sm {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  padding: 0.5rem 1rem;
-  background-color: transparent;
-  color: #FFFFFF;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  font-family: var(--font-unbounded);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  text-decoration: none;
-}
-.btn-ghost-sm:hover {
-  background-color: #FFFFFF;
-  color: #000000;
-  border-color: #FFFFFF;
-}
-
-.btn-ghost-ash {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.85rem 1.75rem;
-  background-color: #181818;
-  color: #CFCFCF;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  font-family: var(--font-unbounded);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  text-decoration: none;
-}
-.btn-ghost-ash:hover {
-  background-color: #242424;
-  color: #FFFFFF;
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-/* Luxury Gold Button */
-.btn-momen-gold {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  background-color: #B88E4F;
-  color: #FFFFFF;
-  padding: 0.75rem 1.75rem;
-  border-radius: 9999px;
-  font-weight: 500;
-  font-size: 0.95rem;
-  letter-spacing: 0.01em;
+  box-shadow: 0 6px 18px -2px rgba(126, 94, 54, 0.35);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 14px 0 rgba(184, 142, 79, 0.35);
-  cursor: pointer;
-  text-decoration: none;
 }
-.btn-momen-gold:hover {
-  background-color: #A57B3F;
-  box-shadow: 0 6px 20px 0 rgba(184, 142, 79, 0.45);
+.btn-gold-gradient:hover {
+  background: linear-gradient(135deg, #B59264 0%, #8D6B3E 100%);
+  box-shadow: 0 8px 24px -2px rgba(126, 94, 54, 0.45);
   transform: translateY(-1px);
 }
-.btn-momen-gold:active {
+.btn-gold-gradient:active {
   transform: translateY(0);
 }
 
-/* Glass Outline Button */
-.btn-momen-outline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  background-color: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #FFFFFF;
-  padding: 0.75rem 1.75rem;
-  border-radius: 9999px;
-  font-weight: 500;
-  font-size: 0.95rem;
-  letter-spacing: 0.01em;
-  transition: all 0.25s ease;
-  cursor: pointer;
-  text-decoration: none;
-}
-.btn-momen-outline:hover {
-  background-color: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.5);
-  transform: translateY(-1px);
-}
-
-/* Light theme outline button */
-.btn-momen-outline-dark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  background-color: transparent;
-  border: 1px solid #D8CFC4;
-  color: #201C19;
-  padding: 0.75rem 1.75rem;
-  border-radius: 9999px;
-  font-weight: 500;
-  font-size: 0.95rem;
-  transition: all 0.25s ease;
-  cursor: pointer;
-}
-.btn-momen-outline-dark:hover {
-  background-color: #F3ECE2;
-  border-color: #B88E4F;
-  color: #B88E4F;
-}
-
-/* Custom scrollbar */
+/* Custom warm scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: #141210;
+  background: #F6F1E9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #3A342E;
-  border-radius: 3px;
+  background: #D8CCBD;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #B88E4F;
+  background: #9E7B4F;
 }
 
 ::selection {
-  background: #B88E4F;
+  background: #9E7B4F;
   color: #FFFFFF;
 }

@@ -11,6 +11,8 @@ import {
   onSnapshot,
   writeBatch,
   increment,
+  serverTimestamp,
+  type Timestamp,
   type Unsubscribe,
 } from "firebase/firestore";
 import { getFirebase } from "@/lib/firebase";
@@ -102,7 +104,7 @@ export async function addComment(params: AddCommentParams): Promise<CommentDoc> 
       authorUid: currentUid,
       authorName: cleanAuthorName,
       message: cleanMessage,
-      createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } as CommentDoc["createdAt"],
+      createdAt: serverTimestamp() as unknown as Timestamp,
     };
 
     const batch = writeBatch(db);
